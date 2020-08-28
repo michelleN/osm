@@ -110,6 +110,9 @@ func (d *dashboardCmd) run() error {
 	listOptions := metav1.ListOptions{LabelSelector: set.AsSelector().String()}
 	pods, err := v1ClientSet.Pods(settings.Namespace()).
 		List(context.TODO(), listOptions)
+	if err != nil {
+		log.Fatalf("Error listing pods: %s", err)
+	}
 
 	// Will select first running Pod available
 	it := 0
@@ -156,15 +159,15 @@ func (d *dashboardCmd) run() error {
 
 	// This routine blocks on readyChan til forwarding is setup and ready.
 	go func() {
-		select {
-		case <-readyChan:
-			break
-		}
+		<-readyChan
 		log.Printf("[+] Port forwarding successful (localhost:%d)\n", d.localPort)
+		close(readyChan)
 		if d.openBrowser {
 			url := fmt.Sprintf("http://localhost:%d", d.localPort)
 			log.Printf("[+] Issuing open browser %s\n", url)
-			browser.OpenURL(url)
+			if err := browser.OpenURL(url); err != nil {
+				log.Println("Issue opening browser")
+			}
 		}
 	}()
 

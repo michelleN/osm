@@ -15,22 +15,23 @@ import (
 )
 
 var _ = Describe("Running the mesh delete command", func() {
+	var meshName string = "testing"
 	Context("default parameters", func() {
 		var (
 			deleteCmd *meshDeleteCmd
-			meshName  string
 			force     bool
 		)
 
 		When("the mesh exists", func() {
-			meshName = "testing"
 			store := storage.Init(driver.NewMemory())
 			if mem, ok := store.Driver.(*driver.Memory); ok {
 				mem.SetNamespace(settings.Namespace())
 			}
 
 			rel := release.Mock(&release.MockReleaseOptions{Name: meshName})
-			store.Create(rel)
+			if err := store.Create(rel); err != nil {
+				Fail(err.Error())
+			}
 
 			testConfig := &helm.Configuration{
 				Releases: store,
@@ -67,14 +68,15 @@ var _ = Describe("Running the mesh delete command", func() {
 		})
 
 		When("the mesh doesn't exist", func() {
-			meshName = "testing"
 			store := storage.Init(driver.NewMemory())
 			if mem, ok := store.Driver.(*driver.Memory); ok {
 				mem.SetNamespace(settings.Namespace())
 			}
 
 			rel := release.Mock(&release.MockReleaseOptions{Name: "other-mesh"})
-			store.Create(rel)
+			if err := store.Create(rel); err != nil {
+				Fail(err.Error())
+			}
 
 			testConfig := &helm.Configuration{
 				Releases: store,
@@ -113,7 +115,6 @@ var _ = Describe("Running the mesh delete command", func() {
 	Context("custom parameters", func() {
 		var (
 			deleteCmd *meshDeleteCmd
-			meshName  string
 			force     bool
 		)
 		When("force is true", func() {
@@ -124,7 +125,9 @@ var _ = Describe("Running the mesh delete command", func() {
 			}
 
 			rel := release.Mock(&release.MockReleaseOptions{Name: "other-mesh"})
-			store.Create(rel)
+			if err := store.Create(rel); err != nil {
+				Fail(err.Error())
+			}
 
 			testConfig := &helm.Configuration{
 				Releases: store,

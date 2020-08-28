@@ -32,7 +32,6 @@ var (
 	testCertManagerIssuerName  = "my-osm-ca"
 	testCertManagerIssuerKind  = "ClusterIssuer"
 	testCertManagerIssuerGroup = "example.co.uk"
-	testCABundleSecretName     = "osm-ca-bundle"
 	testRetentionTime          = "5d"
 	testMeshCIDR               = "10.20.0.0/16"
 	testMeshCIDRRanges         = []string{testMeshCIDR}
@@ -581,7 +580,9 @@ var _ = Describe("Running the install command", func() {
 
 			fakeClientSet = fake.NewSimpleClientset()
 			deploymentSpec := createDeploymentSpec(settings.Namespace(), defaultMeshName)
-			fakeClientSet.AppsV1().Deployments(settings.Namespace()).Create(context.TODO(), deploymentSpec, metav1.CreateOptions{})
+			if _, err := fakeClientSet.AppsV1().Deployments(settings.Namespace()).Create(context.TODO(), deploymentSpec, metav1.CreateOptions{}); err != nil {
+				Fail(err.Error())
+			}
 
 			install = &installCmd{
 				out:                        out,
@@ -650,7 +651,9 @@ var _ = Describe("Running the install command", func() {
 
 			fakeClientSet = fake.NewSimpleClientset()
 			deploymentSpec := createDeploymentSpec(settings.Namespace(), defaultMeshName)
-			fakeClientSet.AppsV1().Deployments(settings.Namespace()).Create(context.TODO(), deploymentSpec, metav1.CreateOptions{})
+			if _, err := fakeClientSet.AppsV1().Deployments(settings.Namespace()).Create(context.TODO(), deploymentSpec, metav1.CreateOptions{}); err != nil {
+				Fail(err.Error())
+			}
 
 			install = &installCmd{
 				out:                        out,

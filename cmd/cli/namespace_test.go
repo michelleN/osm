@@ -39,7 +39,9 @@ var _ = Describe("Running the namespace add command", func() {
 				fakeClientSet = fake.NewSimpleClientset()
 
 				nsSpec := createNamespaceSpec(testNamespace, "", false)
-				fakeClientSet.CoreV1().Namespaces().Create(context.TODO(), nsSpec, metav1.CreateOptions{})
+				if _, err := fakeClientSet.CoreV1().Namespaces().Create(context.TODO(), nsSpec, metav1.CreateOptions{}); err != nil {
+					Fail(err.Error())
+				}
 
 				namespaceAddCmd := &namespaceAddCmd{
 					out:        out,
@@ -126,10 +128,14 @@ var _ = Describe("Running the namespace add command", func() {
 				testNamespace2 = "namespace2"
 
 				nsSpec := createNamespaceSpec(testNamespace, "", false)
-				fakeClientSet.CoreV1().Namespaces().Create(context.TODO(), nsSpec, metav1.CreateOptions{})
+				if _, err := fakeClientSet.CoreV1().Namespaces().Create(context.TODO(), nsSpec, metav1.CreateOptions{}); err != nil {
+					Fail(err.Error())
+				}
 
 				nsSpec2 := createNamespaceSpec(testNamespace2, "", false)
-				fakeClientSet.CoreV1().Namespaces().Create(context.TODO(), nsSpec2, metav1.CreateOptions{})
+				if _, err := fakeClientSet.CoreV1().Namespaces().Create(context.TODO(), nsSpec2, metav1.CreateOptions{}); err != nil {
+					Fail(err.Error())
+				}
 
 				namespaceAddCmd := &namespaceAddCmd{
 					out:        out,
@@ -166,10 +172,14 @@ var _ = Describe("Running the namespace add command", func() {
 				fakeClientSet = fake.NewSimpleClientset()
 				// mimic osm controller deployment in testNamespace
 				deploymentSpec := createDeploymentSpec(testNamespace, defaultMeshName)
-				fakeClientSet.AppsV1().Deployments(testNamespace).Create(context.TODO(), deploymentSpec, metav1.CreateOptions{})
+				if _, err := fakeClientSet.AppsV1().Deployments(testNamespace).Create(context.TODO(), deploymentSpec, metav1.CreateOptions{}); err != nil {
+					Fail(err.Error())
+				}
 
 				nsSpec := createNamespaceSpec(testNamespace, "", false)
-				fakeClientSet.CoreV1().Namespaces().Create(context.TODO(), nsSpec, metav1.CreateOptions{})
+				if _, err := fakeClientSet.CoreV1().Namespaces().Create(context.TODO(), nsSpec, metav1.CreateOptions{}); err != nil {
+					Fail(err.Error())
+				}
 
 				namespaceAddCmd := &namespaceAddCmd{
 					out:        out,
@@ -232,7 +242,9 @@ var _ = Describe("Running the namespace remove command", func() {
 			fakeClientSet = fake.NewSimpleClientset()
 
 			nsSpec := createNamespaceSpec(testNamespace, testMeshName, false)
-			fakeClientSet.CoreV1().Namespaces().Create(context.TODO(), nsSpec, metav1.CreateOptions{})
+			if _, err := fakeClientSet.CoreV1().Namespaces().Create(context.TODO(), nsSpec, metav1.CreateOptions{}); err != nil {
+				Fail(err.Error())
+			}
 
 			namespaceRemoveCmd := &namespaceRemoveCmd{
 				out:       out,
@@ -317,7 +329,9 @@ var _ = Describe("Running the namespace remove command", func() {
 			fakeClientSet = fake.NewSimpleClientset()
 
 			nsSpec := createNamespaceSpec(testNamespace, testMeshName, false)
-			fakeClientSet.CoreV1().Namespaces().Create(context.TODO(), nsSpec, metav1.CreateOptions{})
+			if _, err := fakeClientSet.CoreV1().Namespaces().Create(context.TODO(), nsSpec, metav1.CreateOptions{}); err != nil {
+				Fail(err.Error())
+			}
 
 			namespaceRemoveCmd := &namespaceRemoveCmd{
 				out:       out,
@@ -348,7 +362,9 @@ var _ = Describe("Running the namespace remove command", func() {
 			fakeClientSet = fake.NewSimpleClientset()
 
 			nsSpec := createNamespaceSpec(testNamespace, "", false)
-			fakeClientSet.CoreV1().Namespaces().Create(context.TODO(), nsSpec, metav1.CreateOptions{})
+			if _, err := fakeClientSet.CoreV1().Namespaces().Create(context.TODO(), nsSpec, metav1.CreateOptions{}); err != nil {
+				Fail(err.Error())
+			}
 
 			namespaceRemoveCmd := &namespaceRemoveCmd{
 				out:       out,
@@ -411,7 +427,9 @@ var _ = Describe("Running the namespace list command", func() {
 		// helper function that adds a name space to the clientset
 		addNamespace := func(name, mesh string) {
 			ns := createNamespaceSpec(name, mesh, false)
-			fakeClientSet.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
+			if _, err := fakeClientSet.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{}); err != nil {
+				Fail(err.Error())
+			}
 		}
 
 		// helper function that takes element from slice and returns the name for gomega struct
@@ -501,13 +519,13 @@ var _ = Describe("Running the namespace list command", func() {
 
 			err = listCmd.run()
 			Expect(err).NotTo(HaveOccurred())
-			Expect(out.String()).To(Equal(fmt.Sprintf("No namespaces in any mesh\n")))
+			Expect(out.String()).To(Equal("No namespaces in any mesh\n"))
 		})
 
 		It("should print no namespaces message if there are no namespaces", func() {
 			err = listCmd.run()
 			Expect(err).NotTo(HaveOccurred())
-			Expect(out.String()).To(Equal(fmt.Sprintf("No namespaces in any mesh\n")))
+			Expect(out.String()).To(Equal("No namespaces in any mesh\n"))
 		})
 	})
 })

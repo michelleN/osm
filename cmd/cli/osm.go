@@ -44,7 +44,9 @@ func newRootCmd(config *action.Configuration, in io.Reader, out io.Writer, args 
 		newVersionCmd(out),
 	)
 
-	flags.Parse(args)
+	if err := flags.Parse(args); err != nil {
+		fmt.Fprintf(out, "Error parsing flag definitions: %s", err)
+	}
 
 	return cmd
 }
@@ -52,7 +54,10 @@ func newRootCmd(config *action.Configuration, in io.Reader, out io.Writer, args 
 func main() {
 	actionConfig := new(action.Configuration)
 	cmd := newRootCmd(actionConfig, os.Stdin, os.Stdout, os.Args[1:])
-	actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), "secret", debug)
+	if err := actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), "secret", debug); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
 
 	// run when each command's execute method is called
 	cobra.OnInitialize(func() {
@@ -67,5 +72,5 @@ func main() {
 }
 
 func debug(format string, v ...interface{}) {
-	format = fmt.Sprintf("[debug] %s\n", format)
+	fmt.Printf("[debug] %s\n", format)
 }

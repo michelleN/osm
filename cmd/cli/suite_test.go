@@ -12,7 +12,7 @@ import (
 
 func TestCLI(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Test Suite")
+	RunSpecs(t, "OSM CLI Test Suite")
 }
 
 var _ = BeforeSuite(func() {

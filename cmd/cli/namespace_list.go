@@ -79,7 +79,7 @@ func (l *namespaceListCmd) run() error {
 	w := newTabWriter(l.out)
 	fmt.Fprintln(w, "NAMESPACE\tMESH\t")
 	for _, ns := range namespaces.Items {
-		osmName, _ := ns.ObjectMeta.Labels[constants.OSMKubeResourceMonitorAnnotation]
+		osmName := ns.ObjectMeta.Labels[constants.OSMKubeResourceMonitorAnnotation]
 		fmt.Fprintf(w, "%s\t%s\t\n", ns.Name, osmName)
 	}
 	w.Flush()
