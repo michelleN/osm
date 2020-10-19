@@ -218,9 +218,34 @@ func main() {
 
 	funcProbes := []health.Probes{xdsServer}
 	httpProbes := getHTTPHealthProbes()
-	httpServer := httpserver.NewHTTPServer(funcProbes, httpProbes, metricsStore, constants.MetricsServerPort, debugServer)
+	httpServer := httpserver.NewHTTPServer(funcProbes, httpProbes, metricsStore, constants.MetricsServerPort)
 	httpServer.Start()
 
+	//psuedo code
+	var debugServer debugger.DebugServer
+	debugServerIsRunning := false
+	debugServer = debugger.NewDebugServer(certDebugger, xdsServer, meshCatalog, kubeConfig, kubeClient, cfg, kubernetesClient)
+	debugHttpServer := httpserver.NewDebugServer(debugServer, debugPort) //debugPort is new. create new var for that
+
+	if cfg.IsDebugServerEnabled() {
+		debugServerIsRunning = true
+		debugHttpServer.Start()
+	}
+
+	go func() {
+		for {
+			change := <-cfg.GetAnnouncementsChannel()
+			fmt.Println("CHANGEEE:", change)
+			if debugServerIsRunning && !cfg.IsEnableDebugserver() {
+				// shut off the debug server
+				// debugHttpServer.Stop() // close server
+			}
+
+			if !debugServerIsRunning && cfg.IsEnableDebugServer() {
+				// debugHttpServer.Start()
+			}
+		}
+	}()
 	// Wait for exit handler signal
 	<-stop
 
