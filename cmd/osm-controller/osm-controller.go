@@ -82,6 +82,10 @@ var (
 	certmanagerIssuerGroup = flags.String("cert-manager-issuer-group", "cert-manager.io", "cert-manager issuer group")
 )
 
+type controller struct {
+	debugServerRunning bool
+}
+
 func init() {
 	flags.StringVarP(&verbosity, "verbosity", "v", "info", "Set log verbosity level")
 	flags.StringVar(&meshName, "mesh-name", "", "OSM mesh name")
@@ -225,17 +229,31 @@ func main() {
 	httpServer.Start()
 
 	// Expose /debug endpoints and data only if the enableDebugServer flag is enabled
-	initDebugServer(cfg, certDebugger, xdsServer, meshCatalog, kubeConfig, kubeClient, kubernetesClient, stop)
+	controller := controller{
+		debugServerRunning: true,
+	}
+	controller.initDebugServer(cfg, certDebugger, xdsServer, meshCatalog, kubeConfig, kubeClient, kubernetesClient, stop)
+	go controller.watchDebugConfigAndUpdateDebugServer()
 
 	log.Info().Msg("Goodbye!")
 }
-func initDebugServer(cfg configurator.Configurator, certDebugger debugger.CertificateManagerDebugger, xdsServer *ads.Server, meshCatalog *catalog.MeshCatalog, kubeConfig *restclient.Config, kubeClient *kubernetes.Clientset, kubernetesClient k8s.Controller, stop chan struct{}) {
-	debugServerRunning := !cfg.IsDebugServerEnabled()
-	debugImpl := debugger.NewDebugImpl(certDebugger, xdsServer, meshCatalog, kubeConfig, kubeClient, cfg, kubernetesClient)
-	debugServer := httpserver.NewDebugHTTPServer(debugImpl, constants.DebugPort)
+func (c *controller) startNewDebugServer() {
+	debugComponents := debugger.NewDebugImpl(certDebugger, xdsServer, meshCatalog, kubeConfig, kubeClient, cfg, kubernetesClient)
+	debugServer := httpserver.NewDebugHTTPServer(debugComponents, constants.DebugPort)
+	debugServer.Start()
+}
+
+func (c *controller) watchDebugConfigAndUpdateDebugServer() {
+	c.configureDebugServer(c.debugServer, debugImpl, c.debugServerRunning, cfg, errCh)
+}
+
+func (c *controller) initDebugServer(cfg configurator.Configurator, certDebugger debugger.CertificateManagerDebugger, xdsServer *ads.Server, meshCatalog *catalog.MeshCatalog, kubeConfig *restclient.Config, kubeClient *kubernetes.Clientset, kubernetesClient k8s.Controller, stop chan struct{}) {
+	c.debugServerRunning = cfg.IsDebugServerEnabled()
+	if cfg.IsDebugServerEnabled() {
+		c.startNewDebugServer()
+	}
 
 	errCh := make(chan error)
-	go configureDebugServer(debugServer, debugImpl, debugServerRunning, cfg, errCh)
 
 	select {
 	case err := <-errCh:
@@ -246,21 +264,53 @@ func initDebugServer(cfg configurator.Configurator, certDebugger debugger.Certif
 	}
 }
 
-func configureDebugServer(debugServer httpserver.DebugServerInterface, debugImpl debugger.DebugServer, debugServerRunning bool, cfg configurator.Configurator, errCh chan error) {
+type controller struct {
+	debugServerRunning bool // represent whether the debug server is currently running
+	debugServer        httpserver.DebugServerInterface
+}
+
+/*
+In the test,
+c := controller{
+				debugServerRunning: false,
+				debugServer: nil,
+			}
+c.configureDebugServer()
+update the configmap to have enable debug server = true
+assert(c.debugServerRunning, true)
+assert(c.debugServer != nil)
+also that Start() was called on the new debugServer
+
+For the stop scenario:
+c := controller {
+	debugServerRunning: true,
+	debugServer: fakeDebugServer, // create a fake debug server to pass in
+}
+c.configureDebugServer()
+update configmap enable debug server = false
+assert c.debugServer = nil
+assert c.debugServerRunning = false
+
+
+*/
+
+func (c *controller) configureDebugServer(debugServer httpserver.DebugServerInterface, debugImpl debugger.DebugServer, debugServerRunning bool, cfg configurator.Configurator, errCh chan error) {
 	for range cfg.GetAnnouncementsChannel() {
 		if debugServerRunning && !cfg.IsDebugServerEnabled() {
 			fmt.Println("POWRJKL;ASDGASF ENTERED STOPPING")
-			debugServerRunning = false
 			err := debugServer.Stop()
 			if err != nil {
 				log.Error().Err(err).Msg("Unable to stop debug server")
 				errCh <- err
 			}
+			debugServerRunning = false
+			c.debugServer = nil
 		} else if !debugServerRunning && cfg.IsDebugServerEnabled() {
 			fmt.Println("ENTERED STARTING ASADFWAETDFGAR")
-			debugServerRunning = true
-			debugServer = httpserver.NewDebugHTTPServer(debugImpl, constants.DebugPort) //.(*httpserver.DebugServer)
+			c.debugServer = httpserver.NewDebugHTTPServer(debugImpl, constants.DebugPort) //.(*httpserver.DebugServer)
 			debugServer.Start()
+			c.debugServerRunning = true
+
 		}
 	}
 }
