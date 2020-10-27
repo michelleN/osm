@@ -17,6 +17,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/openservicemesh/osm/pkg/catalog"
@@ -218,21 +219,50 @@ func main() {
 	// TODO(draychev): figure out the NS and POD
 	metricsStore := metricsstore.NewMetricStore("TBD_NameSpace", "TBD_PodName")
 
-	// Expose /debug endpoints and data only if the enableDebugServer flag is enabled
-	var debugServer debugger.DebugServer
-	if cfg.IsDebugServerEnabled() {
-		debugServer = debugger.NewDebugServer(certDebugger, xdsServer, meshCatalog, kubeConfig, kubeClient, cfg, kubernetesClient)
-	}
-
 	funcProbes := []health.Probes{xdsServer}
 	httpProbes := getHTTPHealthProbes()
-	httpServer := httpserver.NewHTTPServer(funcProbes, httpProbes, metricsStore, constants.MetricsServerPort, debugServer)
+	httpServer := httpserver.NewHTTPServer(funcProbes, httpProbes, metricsStore, constants.MetricsServerPort)
 	httpServer.Start()
 
-	// Wait for exit handler signal
-	<-stop
+	// Expose /debug endpoints and data only if the enableDebugServer flag is enabled
+	initDebugServer(cfg, certDebugger, xdsServer, meshCatalog, kubeConfig, kubeClient, kubernetesClient, stop)
 
 	log.Info().Msg("Goodbye!")
+}
+func initDebugServer(cfg configurator.Configurator, certDebugger debugger.CertificateManagerDebugger, xdsServer *ads.Server, meshCatalog *catalog.MeshCatalog, kubeConfig *restclient.Config, kubeClient *kubernetes.Clientset, kubernetesClient k8s.Controller, stop chan struct{}) {
+	debugServerRunning := !cfg.IsDebugServerEnabled()
+	debugImpl := debugger.NewDebugImpl(certDebugger, xdsServer, meshCatalog, kubeConfig, kubeClient, cfg, kubernetesClient)
+	debugServer := httpserver.NewDebugHTTPServer(debugImpl, constants.DebugPort)
+
+	errCh := make(chan error)
+	go configureDebugServer(debugServer, debugImpl, debugServerRunning, cfg, errCh)
+
+	select {
+	case err := <-errCh:
+		log.Error().Err(err).Msg("Unable to configure debug server")
+
+		// Wait for exit handler signal
+	case <-stop:
+	}
+}
+
+func configureDebugServer(debugServer httpserver.DebugServerInterface, debugImpl debugger.DebugServer, debugServerRunning bool, cfg configurator.Configurator, errCh chan error) {
+	for range cfg.GetAnnouncementsChannel() {
+		if debugServerRunning && !cfg.IsDebugServerEnabled() {
+			fmt.Println("POWRJKL;ASDGASF ENTERED STOPPING")
+			debugServerRunning = false
+			err := debugServer.Stop()
+			if err != nil {
+				log.Error().Err(err).Msg("Unable to stop debug server")
+				errCh <- err
+			}
+		} else if !debugServerRunning && cfg.IsDebugServerEnabled() {
+			fmt.Println("ENTERED STARTING ASADFWAETDFGAR")
+			debugServerRunning = true
+			debugServer = httpserver.NewDebugHTTPServer(debugImpl, constants.DebugPort) //.(*httpserver.DebugServer)
+			debugServer.Start()
+		}
+	}
 }
 
 func getHTTPHealthProbes() []health.HTTPProbe {
