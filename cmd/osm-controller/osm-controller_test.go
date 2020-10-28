@@ -42,10 +42,32 @@ func (f *FakeDebugServer) Start() {
 	fmt.Println("ENTERED STARTING")
 	f.startCount++
 }
+
+type testCase struct {
+	fakeDebugServer           FakeDebugServer
+	initialDebugServerRunning bool
+	expectedErr               bool
+	expectedStartCount        int
+	expectedStopCount         int
+}
+
 func TestConfigureDebugServer(t *testing.T) {
 	assert := assert.New(t)
 	const testPort = 9999
 	const validRoutePath = "/debug/test1"
+
+	testCases := []testCase{
+		testCase{
+			fakeDebugServer:           fake,
+			initialDebugServerRunning: false,
+			expectedErr,
+		},
+		testCase{
+			fakeDebugServer:           fake,
+			initialDebugServerRunning: false,
+			expectedErr:               true,
+		},
+	}
 
 	defaultConfigMap := map[string]string{
 		"enabled_debug_server": "false",
