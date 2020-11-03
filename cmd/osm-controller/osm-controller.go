@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"sync"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
@@ -247,10 +248,12 @@ func main() {
 
 func (c *controller) configureDebugServer(cfg configurator.Configurator) {
 	//GetAnnouncementsChannel will check ConfigMap every 3 * time.Second
+	var mutex = &sync.Mutex{}
 	for range cfg.GetAnnouncementsChannel() {
 		fmt.Println("announcement")
 		fmt.Printf("c.debugServerRunning: %t | cfg.IsDebugServerEnabled(): %t", c.debugServerRunning, cfg.IsDebugServerEnabled())
 		if c.debugServerRunning && !cfg.IsDebugServerEnabled() {
+			mutex.Lock()
 			fmt.Println("stop")
 			err := c.debugServer.Stop()
 			if err != nil {
@@ -259,11 +262,16 @@ func (c *controller) configureDebugServer(cfg configurator.Configurator) {
 				c.debugServer = nil
 			}
 			c.debugServerRunning = false
+			mutex.Unlock()
 		} else if !c.debugServerRunning && cfg.IsDebugServerEnabled() {
+			mutex.Lock()
+
 			fmt.Println("start")
 			c.debugServer = httpserver.NewDebugHTTPServer(c.debugComponents, constants.DebugPort)
 			c.debugServer.Start()
 			c.debugServerRunning = true
+			mutex.Unlock()
+
 		}
 	}
 }
