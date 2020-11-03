@@ -81,6 +81,12 @@ var (
 	certmanagerIssuerGroup = flags.String("cert-manager-issuer-group", "cert-manager.io", "cert-manager issuer group")
 )
 
+type controller struct {
+	debugServerRunning bool
+	debugComponents    debugger.DebugConfig
+	debugServer        httpserver.DebugServerInterface
+}
+
 func init() {
 	flags.StringVarP(&verbosity, "verbosity", "v", "info", "Set log verbosity level")
 	flags.StringVar(&meshName, "mesh-name", "", "OSM mesh name")
@@ -218,21 +224,48 @@ func main() {
 	// TODO(draychev): figure out the NS and POD
 	metricsStore := metricsstore.NewMetricStore("TBD_NameSpace", "TBD_PodName")
 
-	// Expose /debug endpoints and data only if the enableDebugServer flag is enabled
-	var debugServer debugger.DebugServer
-	if cfg.IsDebugServerEnabled() {
-		debugServer = debugger.NewDebugServer(certDebugger, xdsServer, meshCatalog, kubeConfig, kubeClient, cfg, kubernetesClient)
-	}
-
 	funcProbes := []health.Probes{xdsServer}
 	httpProbes := getHTTPHealthProbes()
-	httpServer := httpserver.NewHTTPServer(funcProbes, httpProbes, metricsStore, constants.MetricsServerPort, debugServer)
+	httpServer := httpserver.NewHTTPServer(funcProbes, httpProbes, metricsStore, constants.MetricsServerPort)
 	httpServer.Start()
+
+	// Expose /debug endpoints and data only if the enableDebugServer flag is enabled
+	debugConfig := debugger.NewDebugConfig(certDebugger, xdsServer, meshCatalog, kubeConfig, kubeClient, cfg, kubernetesClient)
+	c := controller{
+		debugServerRunning: !cfg.IsDebugServerEnabled(),
+		debugComponents:    debugConfig,
+		debugServer:        httpserver.NewDebugHTTPServer(debugConfig, constants.DebugPort),
+	}
+
+	go c.configureDebugServer(cfg)
 
 	// Wait for exit handler signal
 	<-stop
 
 	log.Info().Msg("Goodbye!")
+}
+
+func (c *controller) configureDebugServer(cfg configurator.Configurator) {
+	//GetAnnouncementsChannel will check ConfigMap every 3 * time.Second
+	for range cfg.GetAnnouncementsChannel() {
+		fmt.Println("announcement")
+		fmt.Printf("c.debugServerRunning: %t | cfg.IsDebugServerEnabled(): %t", c.debugServerRunning, cfg.IsDebugServerEnabled())
+		if c.debugServerRunning && !cfg.IsDebugServerEnabled() {
+			fmt.Println("stop")
+			err := c.debugServer.Stop()
+			if err != nil {
+				log.Error().Err(err).Msg("Unable to stop debug server")
+			} else {
+				c.debugServer = nil
+			}
+			c.debugServerRunning = false
+		} else if !c.debugServerRunning && cfg.IsDebugServerEnabled() {
+			fmt.Println("start")
+			c.debugServer = httpserver.NewDebugHTTPServer(c.debugComponents, constants.DebugPort)
+			c.debugServer.Start()
+			c.debugServerRunning = true
+		}
+	}
 }
 
 func getHTTPHealthProbes() []health.HTTPProbe {
