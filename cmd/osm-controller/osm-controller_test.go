@@ -68,6 +68,7 @@ func TestConfigureDebugServerStart(t *testing.T) {
 		debugServerRunning: false,
 		debugComponents:    mockDebugConfig(mockCtrl),
 		debugServer:        nil,
+		mutex:              &sync.Mutex{},
 	}
 	go con.configureDebugServer(cfg, stop)
 
@@ -91,8 +92,9 @@ func TestConfigureDebugServerStart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	testAnnouncementsChannel <- "something"
+	cfg.EXPECT().IsDebugServerEnabled().Return(true).Times(10)
 
+	testAnnouncementsChannel <- "something"
 	close(stop)
 
 	if con.debugServerRunning == false {

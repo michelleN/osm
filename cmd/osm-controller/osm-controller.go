@@ -86,6 +86,7 @@ type controller struct {
 	debugServerRunning bool
 	debugComponents    debugger.DebugConfig
 	debugServer        httpserver.DebugServerInterface
+	mutex              *sync.Mutex
 }
 
 func init() {
@@ -236,6 +237,7 @@ func main() {
 		debugServerRunning: !cfg.IsDebugServerEnabled(),
 		debugComponents:    debugConfig,
 		debugServer:        httpserver.NewDebugHTTPServer(debugConfig, constants.DebugPort),
+		mutex:              &sync.Mutex{},
 	}
 
 	go c.configureDebugServer(cfg, stop)
@@ -249,18 +251,18 @@ func main() {
 func (c *controller) configureDebugServer(cfg configurator.Configurator, stop <-chan struct{}) {
 	//GetAnnouncementsChannel will check ConfigMap every 3 * time.Second
 	counter := 0
-	var mutex = &sync.Mutex{}
 	for {
 		select {
 		case <-cfg.GetAnnouncementsChannel():
-			mutex.Lock()
 			counter++
 			log.Info().Msgf("COUNTER %v", counter)
 			fmt.Println("COUNTER", counter)
-			mutex.Unlock()
 
 			if c.debugServerRunning && !cfg.IsDebugServerEnabled() {
-				mutex.Lock()
+				log.Info().Msg("In start")
+				fmt.Println("Are you in start?")
+
+				c.mutex.Lock()
 				err := c.debugServer.Stop()
 				if err != nil {
 					log.Error().Err(err).Msg("Unable to stop debug server")
@@ -268,14 +270,19 @@ func (c *controller) configureDebugServer(cfg configurator.Configurator, stop <-
 					c.debugServer = nil
 				}
 				c.debugServerRunning = false
-				mutex.Unlock()
+				c.mutex.Unlock()
 			} else if !c.debugServerRunning && cfg.IsDebugServerEnabled() {
-				mutex.Lock()
+				log.Info().Msg("In stop")
+
+				fmt.Println("Are you in stop?")
+
+				c.mutex.Lock()
 
 				c.debugServer = httpserver.NewDebugHTTPServer(c.debugComponents, constants.DebugPort)
-				c.debugServer.Start()
 				c.debugServerRunning = true
-				mutex.Unlock()
+
+				c.debugServer.Start()
+				c.mutex.Unlock()
 
 			}
 		case <-stop:
