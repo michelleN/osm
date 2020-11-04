@@ -95,7 +95,6 @@ func TestConfigureDebugServerStart(t *testing.T) {
 	cfg.EXPECT().IsDebugServerEnabled().Return(true).Times(10)
 
 	testAnnouncementsChannel <- "something"
-	close(stop)
 
 	if con.debugServerRunning == false {
 		t.Error("Expected debugServerRunning to be true but was false")

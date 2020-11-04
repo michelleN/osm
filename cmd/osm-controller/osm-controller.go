@@ -262,13 +262,14 @@ func (c *controller) configureDebugServer(cfg configurator.Configurator, stop <-
 				log.Info().Msg("In start")
 				fmt.Println("Are you in start?")
 
-				c.mutex.Lock()
 				err := c.debugServer.Stop()
 				if err != nil {
 					log.Error().Err(err).Msg("Unable to stop debug server")
 				} else {
 					c.debugServer = nil
 				}
+				c.mutex.Lock()
+
 				c.debugServerRunning = false
 				c.mutex.Unlock()
 			} else if !c.debugServerRunning && cfg.IsDebugServerEnabled() {
@@ -276,13 +277,13 @@ func (c *controller) configureDebugServer(cfg configurator.Configurator, stop <-
 
 				fmt.Println("Are you in stop?")
 
+				c.debugServer = httpserver.NewDebugHTTPServer(c.debugComponents, constants.DebugPort)
 				c.mutex.Lock()
 
-				c.debugServer = httpserver.NewDebugHTTPServer(c.debugComponents, constants.DebugPort)
 				c.debugServerRunning = true
 
-				c.debugServer.Start()
 				c.mutex.Unlock()
+				c.debugServer.Start()
 
 			}
 		case <-stop:
