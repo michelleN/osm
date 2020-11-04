@@ -58,7 +58,7 @@ func TestConfigureDebugServerStart(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	stop := make(chan struct{})
 
-	kubeClient, _, cfg, err := setupComponents(testOSMNamespace, testOSMConfigMapName, false, stop)
+	kubeClient, _, cfg, err := setupComponents(testOSMNamespace, testOSMConfigMapName, false, stop, mockCtrl)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +68,7 @@ func TestConfigureDebugServerStart(t *testing.T) {
 		debugComponents:    mockDebugConfig(mockCtrl),
 		debugServer:        nil,
 	}
-	go con.configureDebugServer(cfg)
+	go con.configureDebugServer(cfg, stop)
 
 	updatedConfigMap := v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -76,7 +76,14 @@ func TestConfigureDebugServerStart(t *testing.T) {
 			Name:      testOSMConfigMapName,
 		},
 		Data: map[string]string{
-			"enable_debug_server": "true",
+			"enable_debug_server":            "true",
+			"permissive_traffic_policy_mode": "false",
+			"egress":                         "false",
+			"prometheus_scraping":            "false",
+			"use_https_ingress":              "false",
+			"tracing_enable":                 "false",
+			"envoy_log_level":                "debug",
+			"service_cert_validity_duration": "1h",
 		},
 	}
 	_, err = kubeClient.CoreV1().ConfigMaps(testOSMNamespace).Update(context.TODO(), &updatedConfigMap, metav1.UpdateOptions{})
@@ -84,11 +91,12 @@ func TestConfigureDebugServerStart(t *testing.T) {
 		t.Fatal(err)
 	}
 	close(stop)
-	if con.debugServerRunning == true {
+
+	if con.debugServerRunning == false {
 		t.Error("Expected debugServerRunning to be true but was false")
 	}
 
-	if con.debugServer != nil {
+	if con.debugServer == nil {
 		t.Error("Expected debugServer to not be nil but was nil")
 	}
 
@@ -191,7 +199,7 @@ func TestConfigureDebugServer(t *testing.T) {
 			}
 
 			go tests.c.configureDebugServer(cfg)
-// some loop that waits for wg.Done() ... nothing on f.wg and then check assertions
+// some loop that waits for wg.Wait() ... and then check assertions
 			//update configMap with change to enable_debug_server
 			configMap.Data["enable_debug_server"] = strconv.FormatBool(tests.changeDebugServerEnabledTo)
 			//defaultConfigMap["enable_debug_server"] = strconv.FormatBool(tests.changeDebugServerEnabledTo)
@@ -273,11 +281,18 @@ func TestJoinURL(t *testing.T) {
 }
 */
 
-func setupComponents(namespace, configMapName string, initialDebugServerEnabled bool, stop chan struct{}) (*testclient.Clientset, v1.ConfigMap, configurator.Configurator, error) {
+func setupComponents(namespace, configMapName string, initialDebugServerEnabled bool, stop chan struct{}, mockCtrl *gomock.Controller) (*testclient.Clientset, v1.ConfigMap, configurator.Configurator, error) {
 	kubeClient := testclient.NewSimpleClientset()
 
 	defaultConfigMap := map[string]string{
-		"enable_debug_server": strconv.FormatBool(initialDebugServerEnabled),
+		"enable_debug_server":            strconv.FormatBool(initialDebugServerEnabled),
+		"permissive_traffic_policy_mode": "false",
+		"egress":                         "false",
+		"prometheus_scraping":            "false",
+		"use_https_ingress":              "false",
+		"tracing_enable":                 "false",
+		"envoy_log_level":                "debug",
+		"service_cert_validity_duration": "1h",
 	}
 	configMap := v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -290,6 +305,8 @@ func setupComponents(namespace, configMapName string, initialDebugServerEnabled 
 	if err != nil {
 		return kubeClient, configMap, nil, err
 	}
-	cfg := configurator.NewConfigurator(kubeClient, stop, namespace, configMapName)
+	cfg := configurator.NewMockConfigurator(mockCtrl)
+
+	//cfg := configurator.NewConfigurator(kubeClient, stop, namespace, configMapName)
 	return kubeClient, configMap, cfg, nil
 }

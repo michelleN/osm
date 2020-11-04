@@ -238,7 +238,7 @@ func main() {
 		debugServer:        httpserver.NewDebugHTTPServer(debugConfig, constants.DebugPort),
 	}
 
-	go c.configureDebugServer(cfg)
+	go c.configureDebugServer(cfg, stop)
 
 	// Wait for exit handler signal
 	<-stop
@@ -246,32 +246,33 @@ func main() {
 	log.Info().Msg("Goodbye!")
 }
 
-func (c *controller) configureDebugServer(cfg configurator.Configurator) {
+func (c *controller) configureDebugServer(cfg configurator.Configurator, stop <-chan struct{}) {
 	//GetAnnouncementsChannel will check ConfigMap every 3 * time.Second
 	var mutex = &sync.Mutex{}
-	for range cfg.GetAnnouncementsChannel() {
-		fmt.Println("announcement")
-		fmt.Printf("c.debugServerRunning: %t | cfg.IsDebugServerEnabled(): %t", c.debugServerRunning, cfg.IsDebugServerEnabled())
-		if c.debugServerRunning && !cfg.IsDebugServerEnabled() {
-			mutex.Lock()
-			fmt.Println("stop")
-			err := c.debugServer.Stop()
-			if err != nil {
-				log.Error().Err(err).Msg("Unable to stop debug server")
-			} else {
-				c.debugServer = nil
+	for {
+		select {
+		case <-cfg.GetAnnouncementsChannel():
+			if c.debugServerRunning && !cfg.IsDebugServerEnabled() {
+				mutex.Lock()
+				err := c.debugServer.Stop()
+				if err != nil {
+					log.Error().Err(err).Msg("Unable to stop debug server")
+				} else {
+					c.debugServer = nil
+				}
+				c.debugServerRunning = false
+				mutex.Unlock()
+			} else if !c.debugServerRunning && cfg.IsDebugServerEnabled() {
+				mutex.Lock()
+
+				c.debugServer = httpserver.NewDebugHTTPServer(c.debugComponents, constants.DebugPort)
+				c.debugServer.Start()
+				c.debugServerRunning = true
+				mutex.Unlock()
+
 			}
-			c.debugServerRunning = false
-			mutex.Unlock()
-		} else if !c.debugServerRunning && cfg.IsDebugServerEnabled() {
-			mutex.Lock()
-
-			fmt.Println("start")
-			c.debugServer = httpserver.NewDebugHTTPServer(c.debugComponents, constants.DebugPort)
-			c.debugServer.Start()
-			c.debugServerRunning = true
-			mutex.Unlock()
-
+		case <-stop:
+			return
 		}
 	}
 }
