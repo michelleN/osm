@@ -62,7 +62,8 @@ func TestConfigureDebugServerStart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
+	testAnnouncementsChannel := make(chan interface{})
+	cfg.EXPECT().GetAnnouncementsChannel().Return(testAnnouncementsChannel)
 	con := &controller{
 		debugServerRunning: false,
 		debugComponents:    mockDebugConfig(mockCtrl),
@@ -90,6 +91,8 @@ func TestConfigureDebugServerStart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	testAnnouncementsChannel <- "something"
+
 	close(stop)
 
 	if con.debugServerRunning == false {
@@ -281,7 +284,7 @@ func TestJoinURL(t *testing.T) {
 }
 */
 
-func setupComponents(namespace, configMapName string, initialDebugServerEnabled bool, stop chan struct{}, mockCtrl *gomock.Controller) (*testclient.Clientset, v1.ConfigMap, configurator.Configurator, error) {
+func setupComponents(namespace, configMapName string, initialDebugServerEnabled bool, stop chan struct{}, mockCtrl *gomock.Controller) (*testclient.Clientset, v1.ConfigMap, *configurator.MockConfigurator, error) {
 	kubeClient := testclient.NewSimpleClientset()
 
 	defaultConfigMap := map[string]string{
@@ -303,7 +306,7 @@ func setupComponents(namespace, configMapName string, initialDebugServerEnabled 
 	}
 	_, err := kubeClient.CoreV1().ConfigMaps(namespace).Create(context.TODO(), &configMap, metav1.CreateOptions{})
 	if err != nil {
-		return kubeClient, configMap, nil, err
+		//TODO
 	}
 	cfg := configurator.NewMockConfigurator(mockCtrl)
 

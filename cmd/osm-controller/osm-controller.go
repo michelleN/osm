@@ -248,10 +248,17 @@ func main() {
 
 func (c *controller) configureDebugServer(cfg configurator.Configurator, stop <-chan struct{}) {
 	//GetAnnouncementsChannel will check ConfigMap every 3 * time.Second
+	counter := 0
 	var mutex = &sync.Mutex{}
 	for {
 		select {
 		case <-cfg.GetAnnouncementsChannel():
+			mutex.Lock()
+			counter++
+			log.Info().Msgf("COUNTER %v", counter)
+			fmt.Println("COUNTER", counter)
+			mutex.Unlock()
+
 			if c.debugServerRunning && !cfg.IsDebugServerEnabled() {
 				mutex.Lock()
 				err := c.debugServer.Stop()
