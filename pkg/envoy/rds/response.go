@@ -6,7 +6,7 @@ import (
 	xds_discovery "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
 	"github.com/golang/protobuf/ptypes"
 
-	"github.com/openservicemesh/osm/pkg/catalog"
+	cat "github.com/openservicemesh/osm/pkg/catalog"
 	"github.com/openservicemesh/osm/pkg/certificate"
 	"github.com/openservicemesh/osm/pkg/configurator"
 	"github.com/openservicemesh/osm/pkg/envoy"
@@ -17,69 +17,44 @@ import (
 )
 
 // NewResponse creates a new Route Discovery Response.
-func NewResponse(catalog catalog.MeshCataloger, proxy *envoy.Proxy, _ *xds_discovery.DiscoveryRequest, _ configurator.Configurator, _ certificate.Manager) (*xds_discovery.DiscoveryResponse, error) {
-	svcList, err := catalog.GetServicesFromEnvoyCertificate(proxy.GetCommonName())
+func NewResponse(catalog cat.MeshCataloger, proxy *envoy.Proxy, _ *xds_discovery.DiscoveryRequest, _ configurator.Configurator, _ certificate.Manager) (*xds_discovery.DiscoveryResponse, error) {
+	//svcList, err := catalog.GetServicesFromEnvoyCertificate(proxy.GetCommonName())
+	proxyIdentity, err := cat.GetServiceAccountFromProxyCertificate(proxy.GetCommonName())
 	if err != nil {
-		log.Error().Err(err).Msgf("Error looking up MeshService for Envoy with CN=%q", proxy.GetCommonName())
+		log.Error().Err(err).Msgf("Error looking up Service Account for Envoy with CN=%q", proxy.GetCommonName())
 		return nil, err
 	}
 	// Github Issue #1575
-	proxyServiceName := svcList[0]
+	log.Debug().Msgf("Proxy Service Account %#v", proxyIdentity)
+	//proxyServiceName := svcList[0]
 
-	allTrafficPolicies, err := catalog.ListTrafficPolicies(proxyServiceName)
-	if err != nil {
-		log.Error().Err(err).Msg("Failed listing routes")
-		return nil, err
+	inboundTrafficPolicies, outboundTrafficPolicies, _ := catalog.ListTrafficPoliciesForSA(proxyIdentity)
+	log.Debug().Msgf("For %s: outbound policies: %+v", proxyIdentity, outboundTrafficPolicies)
+	if proxyIdentity.Name == "bookbuyer" {
+		for i, out := range outboundTrafficPolicies {
+			log.Debug().Msgf("outbound[%v] %+v", i, out)
+			for x, rwc := range out.Routes {
+				log.Debug().Msgf("outbound[%v] routeweightedclusters[%v] routeweightedcluster %+v", i, x, rwc.WeightedClusters)
+			}
+		}
 	}
-	log.Debug().Msgf("trafficPolicies: %+v", allTrafficPolicies)
 
 	resp := &xds_discovery.DiscoveryResponse{
 		TypeUrl: string(envoy.TypeRDS),
 	}
 
 	var routeConfiguration []*xds_route.RouteConfiguration
-	outboundRouteConfig := route.NewRouteConfigurationStub(route.OutboundRouteConfigName)
-	inboundRouteConfig := route.NewRouteConfigurationStub(route.InboundRouteConfigName)
-	outboundAggregatedRoutesByHostnames := make(map[string]map[string]trafficpolicy.RouteWeightedClusters)
-	inboundAggregatedRoutesByHostnames := make(map[string]map[string]trafficpolicy.RouteWeightedClusters)
 
-	for _, trafficPolicy := range allTrafficPolicies {
-		isSourceService := trafficPolicy.Source.Equals(proxyServiceName)
-		isDestinationService := trafficPolicy.Destination.Equals(proxyServiceName)
-		svc := trafficPolicy.Destination
-		hostnames, err := catalog.GetResolvableHostnamesForUpstreamService(proxyServiceName, svc)
-		if err != nil {
-			log.Error().Err(err).Msg("Failed listing domains")
-			return nil, err
-		}
-		weightedCluster, err := catalog.GetWeightedClusterForService(svc)
-		if err != nil {
-			log.Error().Err(err).Msg("Failed listing clusters")
-			return nil, err
-		}
-
-		for _, hostname := range hostnames {
-			// All routes from a given source to destination are part of 1 traffic policy between the source and destination.
-			for _, httpRoute := range trafficPolicy.HTTPRoutes {
-				if isSourceService {
-					aggregateRoutesByHost(outboundAggregatedRoutesByHostnames, httpRoute, weightedCluster, hostname)
-				}
-
-				if isDestinationService {
-					aggregateRoutesByHost(inboundAggregatedRoutesByHostnames, httpRoute, weightedCluster, hostname)
-				}
-			}
-		}
-	}
-
+	// fetch ingress routes
+	// merge ingress routes on top of existing
+	/* TODO
 	if err = updateRoutesForIngress(proxyServiceName, catalog, inboundAggregatedRoutesByHostnames); err != nil {
 		return nil, err
 	}
+	*/
 
-	route.UpdateRouteConfiguration(outboundAggregatedRoutesByHostnames, outboundRouteConfig, route.OutboundRoute)
-	route.UpdateRouteConfiguration(inboundAggregatedRoutesByHostnames, inboundRouteConfig, route.InboundRoute)
-	routeConfiguration = append(routeConfiguration, outboundRouteConfig)
-	routeConfiguration = append(routeConfiguration, inboundRouteConfig)
+	routeConfiguration = route.BuildRouteConfiguration(inboundTrafficPolicies, outboundTrafficPolicies)
+	log.Debug().Msgf("routeConfiguration(proxyServiceName %#v): %+v", proxyIdentity, routeConfiguration)
 
 	for _, config := range routeConfiguration {
 		marshalledRouteConfig, err := ptypes.MarshalAny(config)
@@ -88,7 +63,10 @@ func NewResponse(catalog catalog.MeshCataloger, proxy *envoy.Proxy, _ *xds_disco
 			return nil, err
 		}
 		resp.Resources = append(resp.Resources, marshalledRouteConfig)
+
 	}
+	log.Debug().Msgf("proxyServiceName %#v, LEN %v resp.Resources: %+v \n ", proxyIdentity, len(resp.Resources), resp.Resources)
+
 	return resp, nil
 }
 

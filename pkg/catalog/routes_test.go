@@ -5,7 +5,7 @@ import (
 	reflect "reflect"
 	"testing"
 
-	mapset "github.com/deckarep/golang-set"
+	set "github.com/deckarep/golang-set"
 	target "github.com/servicemeshinterface/smi-sdk-go/pkg/apis/access/v1alpha2"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,6 +36,51 @@ var (
 	}
 )
 
+func TestListPoliciesFromTrafficTargets(t *testing.T) {
+	assert := assert.New(t)
+	mc := newFakeMeshCatalogForRoutes(t)
+	expectedOutbound := []*trafficpolicy.OutboundTrafficPolicy{
+		&trafficpolicy.OutboundTrafficPolicy{
+			Name:      "bookstore-v1",
+			Hostnames: tests.BookstoreV1Hostnames,
+			Routes: []*trafficpolicy.RouteWeightedClusters{
+				&trafficpolicy.RouteWeightedClusters{
+					HTTPRoute:        allowAllRoute,
+					WeightedClusters: set.NewSet(tests.BookstoreV1DefaultWeightedCluster),
+				},
+			},
+		},
+		&trafficpolicy.OutboundTrafficPolicy{
+			Name:      "bookstore-v2",
+			Hostnames: tests.BookstoreV2Hostnames,
+			Routes: []*trafficpolicy.RouteWeightedClusters{
+				&trafficpolicy.RouteWeightedClusters{
+					HTTPRoute:        allowAllRoute,
+					WeightedClusters: set.NewSet(tests.BookstoreV2DefaultWeightedCluster),
+				},
+			},
+		},
+		&trafficpolicy.OutboundTrafficPolicy{
+			Name:      "bookstore-apex",
+			Hostnames: tests.BookstoreApexHostnames,
+			Routes: []*trafficpolicy.RouteWeightedClusters{
+				&trafficpolicy.RouteWeightedClusters{
+					HTTPRoute:        allowAllRoute,
+					WeightedClusters: set.NewSet(tests.BookstoreApexDefaultWeightedCluster),
+				},
+			},
+		},
+	}
+
+	t.Run("listPoliciesFromTrafficTargtets", func(t *testing.T) {
+		in, out, err := mc.listPoliciesFromTrafficTargets(tests.BookbuyerServiceAccount)
+		assert.Equal(0, len(in))
+		if !reflect.DeepEqual(expectedOutbound, out) {
+			t.Errorf("expected %v but got %v", expectedOutbound, out)
+		}
+		assert.Nil(err)
+	})
+}
 func TestIsValidTrafficTarget(t *testing.T) {
 	assert := assert.New(t)
 
@@ -81,127 +126,6 @@ func TestIsValidTrafficTarget(t *testing.T) {
 		t.Run(fmt.Sprintf("Testing isValidTrafficTarget when input %s ", tc.name), func(t *testing.T) {
 			actual := isValidTrafficTarget(tc.input)
 			assert.Equal(tc.expected, actual)
-		})
-	}
-}
-
-func TestBuildTrafficPolicies(t *testing.T) {
-	mc := newFakeMeshCatalogForRoutes(t)
-
-	testCases := []struct {
-		name             string
-		sourceServices   []service.MeshService
-		destServices     []service.MeshService
-		routes           []trafficpolicy.HTTPRoute
-		expectedPolicies []*trafficpolicy.TrafficPolicy
-	}{
-		{
-			name:           "policy for 1 source service and 1 destination service with 1 route",
-			sourceServices: []service.MeshService{tests.BookbuyerService},
-			destServices:   []service.MeshService{tests.BookstoreV2Service},
-			routes:         []trafficpolicy.HTTPRoute{testGetAllRoute},
-			expectedPolicies: []*trafficpolicy.TrafficPolicy{
-				{
-					Name:        "bookstore-v2-default",
-					Source:      tests.BookbuyerService,
-					Destination: tests.BookstoreV2Service,
-					HTTPRoutesClusters: []trafficpolicy.RouteWeightedClusters{
-						{
-							HTTPRoute: testGetAllRoute,
-							WeightedClusters: mapset.NewSet(service.WeightedCluster{
-								ClusterName: "default/bookstore-v2",
-								Weight:      100,
-							}),
-						},
-					},
-					Hostnames: tests.BookstoreV2Hostnames,
-				},
-			},
-		},
-		{
-			name:           "policy for 1 source service and 2 destination services with one destination service that doesn't exist",
-			sourceServices: []service.MeshService{tests.BookbuyerService},
-			destServices: []service.MeshService{tests.BookstoreV2Service, {
-				Namespace: "default",
-				Name:      "nonexistentservices",
-			}},
-			routes: []trafficpolicy.HTTPRoute{testGetAllRoute},
-			expectedPolicies: []*trafficpolicy.TrafficPolicy{
-				{
-					Name:        "bookstore-v2-default",
-					Source:      tests.BookbuyerService,
-					Destination: tests.BookstoreV2Service,
-					HTTPRoutesClusters: []trafficpolicy.RouteWeightedClusters{
-						{
-							HTTPRoute: testGetAllRoute,
-							WeightedClusters: mapset.NewSet(service.WeightedCluster{
-								ClusterName: "default/bookstore-v2",
-								Weight:      100,
-							}),
-						},
-					},
-					Hostnames: tests.BookstoreV2Hostnames,
-				},
-			},
-		},
-		{
-			name:           "policies for 1 source service, 2 destination services, and multiple routes ",
-			sourceServices: []service.MeshService{tests.BookbuyerService},
-			destServices:   []service.MeshService{tests.BookstoreV2Service, tests.BookstoreV1Service},
-			routes:         []trafficpolicy.HTTPRoute{testGetAllRoute, testGetSomeRoute},
-			expectedPolicies: []*trafficpolicy.TrafficPolicy{
-				{
-					Name:        "bookstore-v2-default",
-					Source:      tests.BookbuyerService,
-					Destination: tests.BookstoreV2Service,
-					HTTPRoutesClusters: []trafficpolicy.RouteWeightedClusters{
-						{
-							HTTPRoute: testGetAllRoute,
-							WeightedClusters: mapset.NewSet(service.WeightedCluster{
-								ClusterName: "default/bookstore-v2",
-								Weight:      100,
-							}),
-						},
-						{
-							HTTPRoute: testGetSomeRoute,
-							WeightedClusters: mapset.NewSet(service.WeightedCluster{
-								ClusterName: "default/bookstore-v2",
-								Weight:      100,
-							}),
-						},
-					},
-					Hostnames: tests.BookstoreV2Hostnames,
-				},
-				{
-					Name:        "bookstore-v1-default",
-					Source:      tests.BookbuyerService,
-					Destination: tests.BookstoreV1Service,
-					HTTPRoutesClusters: []trafficpolicy.RouteWeightedClusters{
-						{
-							HTTPRoute: testGetAllRoute,
-							WeightedClusters: mapset.NewSet(service.WeightedCluster{
-								ClusterName: "default/bookstore-v1",
-								Weight:      100,
-							}),
-						},
-						{
-							HTTPRoute: testGetSomeRoute,
-							WeightedClusters: mapset.NewSet(service.WeightedCluster{
-								ClusterName: "default/bookstore-v1",
-								Weight:      100,
-							}),
-						},
-					},
-					Hostnames: tests.BookstoreV1Hostnames,
-				},
-			},
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(fmt.Sprintf("Testing build traffic policies when %s ", tc.name), func(t *testing.T) {
-			policies := mc.buildTrafficPolicies(tc.sourceServices, tc.destServices, tc.routes)
-			assert.ElementsMatch(t, tc.expectedPolicies, policies, tc.name)
 		})
 	}
 }
@@ -264,7 +188,7 @@ func TestGetHostnamesForUpstreamService(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(fmt.Sprintf("Testing hostnames when %s svc reaches %s svc", tc.downstream, tc.upstream), func(t *testing.T) {
-			actual, err := mc.GetHostnamesForUpstreamService(tc.downstream, tc.upstream)
+			actual, err := mc.GetHostnamesForUpstreamService(tc.downstream, tc.upstream.Namespace)
 			if tc.expectedErr == false {
 				assert.Nil(err)
 			} else {

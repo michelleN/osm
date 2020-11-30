@@ -150,6 +150,20 @@ var (
 		"bookstore-v2.default.svc.cluster.local:8888",
 	}
 
+	// BookstoreV2Hostnames are the hostnames for the bookstore-v2 service
+	BookstoreApexHostnames = []string{
+		"bookstore-apex",
+		"bookstore-apex.default",
+		"bookstore-apex.default.svc",
+		"bookstore-apex.default.svc.cluster",
+		"bookstore-apex.default.svc.cluster.local",
+		"bookstore-apex:8888",
+		"bookstore-apex.default:8888",
+		"bookstore-apex.default.svc:8888",
+		"bookstore-apex.default.svc.cluster:8888",
+		"bookstore-apex.default.svc.cluster.local:8888",
+	}
+
 	// BookstoreBuyHTTPRoute is an HTTP route to buy books
 	BookstoreBuyHTTPRoute = trafficpolicy.HTTPRoute{
 		PathRegex: BookstoreBuyPath,
@@ -390,6 +404,21 @@ var (
 		Spec: backpressure.BackpressureSpec{
 			MaxConnections: 123,
 		},
+	}
+
+	BookstoreV1DefaultWeightedCluster = service.WeightedCluster{
+		ClusterName: "default/bookstore-v1",
+		Weight:      100,
+	}
+
+	BookstoreV2DefaultWeightedCluster = service.WeightedCluster{
+		ClusterName: "default/bookstore-v2",
+		Weight:      100,
+	}
+
+	BookstoreApexDefaultWeightedCluster = service.WeightedCluster{
+		ClusterName: "default/bookstore-apex",
+		Weight:      100,
 	}
 )
 

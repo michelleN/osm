@@ -26,7 +26,7 @@ func (mc *MeshCatalog) GetServicesForServiceAccount(sa service.K8sServiceAccount
 	if len(services) == 0 {
 		return nil, errServiceNotFoundForAnyProvider
 	}
-
+	log.Debug().Msgf("GetServicesForServiceAccount %v: %v", sa, services)
 	return services, nil
 }
 

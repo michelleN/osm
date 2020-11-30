@@ -226,6 +226,8 @@ func (c *Client) getServicesByLabels(podLabels map[string]string, namespace stri
 		if selector.Matches(labels.Set(podLabels)) {
 			finalList = append(finalList, *svc)
 		}
+		log.Debug().Msgf("pod labels: %v, selector: %v, matched services %v", podLabels, selector, len(finalList))
+
 	}
 
 	return finalList, nil

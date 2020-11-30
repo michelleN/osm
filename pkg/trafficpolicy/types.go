@@ -27,13 +27,21 @@ type TrafficTarget struct {
 	HTTPRoutes  []HTTPRoute         `json:"http_route:omitempty"`
 }
 
-// TrafficPolicy represents route configuration from a source to a destination with an associated set of hostnames
-type TrafficPolicy struct {
-	Name               string                  `json:"name:omitempty"`
-	Destination        service.MeshService     `json:"destination:omitempty"`
-	Source             service.MeshService     `json:"source:omitempty"`
-	HTTPRoutesClusters []RouteWeightedClusters `json:"http_routes:omitempty"`
-	Hostnames          []string                `json:"hostnames:omitempty"`
+type InboundTrafficPolicy struct {
+	Name      string   `json:"name:omitempty"`
+	Hostnames []string `json:"hostnames"`
+	Rules     []*Rule  `json:"rules:omitempty"`
+}
+
+type OutboundTrafficPolicy struct {
+	Name      string                   `json:"name:omitempty"`
+	Hostnames []string                 `json:"hostnames"`
+	Routes    []*RouteWeightedClusters `json:"routes:omitempty"`
+}
+
+type Rule struct {
+	Route           RouteWeightedClusters `json:"route:omitempty"`
+	ServiceAccounts set.Set               `json:"service_accounts:omitempty"` // set of ServiceAccounts
 }
 
 // RouteWeightedClusters is a struct of an HTTPRoute, associated weighted clusters and the domains
