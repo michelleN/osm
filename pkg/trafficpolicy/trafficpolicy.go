@@ -10,9 +10,6 @@ import (
 )
 
 func (in *InboundTrafficPolicy) AddRule(httpRoute HTTPRoute, weightedCluster service.WeightedCluster, sa service.K8sServiceAccount) {
-	//TODO
-	// if Rule with route exists, then apppend sa to sa list
-	// if Rule with route does not exist, then create new one
 
 	route := RouteWeightedClusters{
 		HTTPRoute:        httpRoute,
@@ -61,7 +58,6 @@ func (rwc *RouteWeightedClusters) TotalClustersWeight() int {
 	var totalWeight int
 	if rwc.WeightedClusters.Cardinality() > 0 {
 		for clusterInterface := range rwc.WeightedClusters.Iter() { // iterate
-			log.Debug().Msgf("What is clusterInterface? %v", clusterInterface)
 			cluster := clusterInterface.(service.WeightedCluster)
 			totalWeight += cluster.Weight
 		}

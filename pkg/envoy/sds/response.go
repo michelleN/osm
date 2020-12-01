@@ -112,7 +112,7 @@ func (s *sdsImpl) getSDSSecrets(cert certificate.Certificater, requestedCerts []
 		switch sdsCert.CertType {
 		case envoy.ServiceCertType:
 			// A service certificate is requested
-			envoySecret, err := getServiceCertSecret(cert, requestedCertificate)
+			envoySecret, err := getServiceCertSecret(cert, requestedCertificate) // TODO getServiceServiceAccountSecret
 			if err != nil {
 				log.Error().Err(err).Msgf("Error creating cert %s for proxy %s for service %s", requestedCertificate, s.proxy.GetCommonName(), proxyService)
 				continue

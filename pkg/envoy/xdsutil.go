@@ -38,6 +38,8 @@ type SDSCert struct {
 	CertType SDSCertType
 }
 
+//TODO create two new structs DownstreamSDSCert and UpstreamSDSCert
+
 func (ct SDSCertType) String() string {
 	return string(ct)
 }
@@ -275,10 +277,18 @@ func GetDownstreamTLSContext(upstreamSvc service.MeshService, mTLS bool) *xds_au
 	return tlsConfig
 }
 
+/*
+bookbuyer -> bookstore
+bookbuyerServiceAccount = downstream service account
+client certificate = bookbuyer service account
+server validation certificate = bookstore service
+SAN contains service account
+*/
+
 // GetUpstreamTLSContext creates an upstream Envoy TLS Context for the given downstream and upstream service pair
 func GetUpstreamTLSContext(downstreamSvc, upstreamSvc service.MeshService) *xds_auth.UpstreamTlsContext {
 	downstreamSDSCert := SDSCert{
-		MeshService: downstreamSvc,
+		MeshService: downstreamSvc, //downstreamServiceAccount
 		CertType:    ServiceCertType,
 	}
 	upstreamPeerValidationSDSCert := SDSCert{
