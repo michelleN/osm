@@ -57,6 +57,19 @@ func NewResponse(meshCatalog catalog.MeshCataloger, proxy *envoy.Proxy, _ *xds_d
 	}
 	clusters = append(clusters, localCluster)
 
+	if featureflags.IsRoutesV2Enabled() {
+		// TODO if this service is associated with a trafficsplit service, then add a local cluster for that too
+		for _, splitService := range meshCatalog.GetApexServicesForBackend(proxyServiceName) {
+			lcn := envoy.GetLocalClusterNameForService(splitService)
+			lc, err := getLocalServiceCluster(meshCatalog, splitService, lcn)
+			if err != nil {
+				log.Error().Err(err).Msgf("Failed to get local cluster config for proxy %s", splitService)
+				return nil, err
+			}
+			clusters = append(clusters, lc)
+		}
+	}
+
 	// Add an outbound passthrough cluster for egress
 	if cfg.IsEgressEnabled() {
 		clusters = append(clusters, getOutboundPassthroughCluster())

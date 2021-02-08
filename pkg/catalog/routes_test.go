@@ -10,6 +10,7 @@ import (
 	access "github.com/servicemeshinterface/smi-sdk-go/pkg/apis/access/v1alpha3"
 	spec "github.com/servicemeshinterface/smi-sdk-go/pkg/apis/specs/v1alpha4"
 	specs "github.com/servicemeshinterface/smi-sdk-go/pkg/apis/specs/v1alpha4"
+	split "github.com/servicemeshinterface/smi-sdk-go/pkg/apis/split/v1alpha2"
 	tassert "github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -23,6 +24,41 @@ import (
 	"github.com/openservicemesh/osm/pkg/trafficpolicy"
 	"github.com/openservicemesh/osm/pkg/utils"
 )
+
+func TestListTrafficPoliciesForTrafficSplits(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	mockKubeController := k8s.NewMockController(mockCtrl)
+	mockMeshSpec := smi.NewMockMeshSpec(mockCtrl)
+	mockEndpointProvider := endpoint.NewMockProvider(mockCtrl)
+
+	mc := MeshCatalog{
+		kubeController:     mockKubeController,
+		meshSpec:           mockMeshSpec,
+		endpointsProviders: []endpoint.Provider{mockEndpointProvider},
+	}
+
+	apexMeshService := service.MeshService{
+		Name:      tests.BookstoreApexServiceName,
+		Namespace: tests.Namespace,
+	}
+	apexK8sService := tests.NewServiceFixture(apexMeshService.Name, apexMeshService.Namespace, map[string]string{})
+
+	mockMeshSpec.EXPECT().ListTrafficSplits().Return([]*split.TrafficSplit{&tests.TrafficSplit}).AnyTimes()
+	mockKubeController.EXPECT().GetService(apexMeshService).Return(apexK8sService).AnyTimes()
+
+	namespace := "foo"
+	actual := mc.listTrafficPoliciesForTrafficSplits(namespace)
+	for _, a := range actual {
+		fmt.Println(a)
+		for _, r := range a.Routes {
+			fmt.Println(r)
+		}
+
+	}
+
+}
 
 func TestIsValidTrafficTarget(t *testing.T) {
 	assert := tassert.New(t)

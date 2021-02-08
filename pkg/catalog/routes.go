@@ -22,9 +22,60 @@ const (
 	HTTPTraffic = "HTTPRouteGroup"
 )
 
+var ErrMergePolicies = errors.New("Error merging traffic policies")
+
 var wildCardRouteMatch trafficpolicy.HTTPRouteMatch = trafficpolicy.HTTPRouteMatch{
 	PathRegex: constants.RegexMatchAll,
 	Methods:   []string{constants.WildcardHTTPMethod},
+}
+
+func (mc *MeshCatalog) listTrafficPoliciesForTrafficSplits(namespace string) []*trafficpolicy.OutboundTrafficPolicy {
+	outboundPoliciesFromSplits := []*trafficpolicy.OutboundTrafficPolicy{}
+
+	apexServices := mapset.NewSet()
+	outboundPoliciesToMerge := []*trafficpolicy.OutboundTrafficPolicy{}
+	for _, split := range mc.meshSpec.ListTrafficSplits() {
+		svc := service.MeshService{
+			Name:      split.Spec.Service,
+			Namespace: split.ObjectMeta.Namespace,
+		}
+
+		hostnames, err := mc.getServiceHostnames(svc, svc.Namespace == namespace)
+		if err != nil {
+			log.Error().Err(err).Msgf("Error getting service hostnames for apex service %v", svc)
+			continue
+		}
+		rwc := trafficpolicy.RouteWeightedClusters{
+			HTTPRouteMatch:   wildCardRouteMatch,
+			WeightedClusters: mapset.NewSet(),
+		}
+		for _, backend := range split.Spec.Backends {
+			ms := service.MeshService{Name: backend.Service, Namespace: split.ObjectMeta.Namespace}
+			wc := service.WeightedCluster{
+				ClusterName: service.ClusterName(ms.String()),
+				Weight:      backend.Weight,
+			}
+			rwc.WeightedClusters.Add(wc)
+		}
+
+		policy := &trafficpolicy.OutboundTrafficPolicy{
+			Name:      split.Spec.Service + "-" + split.ObjectMeta.Namespace,
+			Hostnames: hostnames,
+			Routes:    []*trafficpolicy.RouteWeightedClusters{&rwc},
+		}
+		if apexServices.Contains(svc) {
+			outboundPoliciesToMerge = append(outboundPoliciesToMerge, policy)
+		} else {
+			outboundPoliciesFromSplits = append(outboundPoliciesFromSplits, policy)
+			apexServices.Add(svc)
+		}
+	}
+
+	outboundPoliciesFromSplits, mergeErrs := trafficpolicy.MergeOutboundPolicies(outboundPoliciesFromSplits, outboundPoliciesToMerge...)
+	if len(mergeErrs) > 0 {
+		log.Error().Err(ErrMergePolicies).Msgf("Error calculating traffic policies from SMI Traffic Splits: %v", mergeErrs)
+	}
+	return outboundPoliciesFromSplits
 }
 
 // ListTrafficPoliciesForServiceAccount returns all inbound and outbound traffic policies related to the given service account
@@ -36,8 +87,12 @@ func (mc *MeshCatalog) ListTrafficPoliciesForServiceAccount(sa service.K8sServic
 		return nil, nil, err
 	}
 
-	//	TODO: handle traffic splits, merge policies from traffic splits into outbound policies (#705)
-	//	TODO: handle ingress, merge policies from ingress resources into inbound policies (#2034)
+	outboundPoliciesFromSplits := mc.listTrafficPoliciesForTrafficSplits(sa.Namespace)
+	outbound, mergeErrs := trafficpolicy.MergeOutboundPolicies(outbound, outboundPoliciesFromSplits...)
+	if len(mergeErrs) > 0 {
+		log.Error().Err(ErrMergePolicies).Msgf("Error merging outbound traffic policies with policies from SMI Traffic Splits: %v", mergeErrs)
+	}
+
 	return inbound, outbound, nil
 }
 

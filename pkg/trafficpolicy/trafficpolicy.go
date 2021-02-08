@@ -166,7 +166,7 @@ func mergeRoutesWeightedClusters(originalRoutes, latestRoutes []*RouteWeightedCl
 			if reflect.DeepEqual(original.HTTPRouteMatch, latest.HTTPRouteMatch) {
 				foundRoute = true
 				if !reflect.DeepEqual(original.WeightedClusters, latest.WeightedClusters) {
-					mergeErrors = append(mergeErrors, errors.Errorf("Error merging RoutesWeightedClusters %v with %v", original, latest))
+					original.WeightedClusters = latest.WeightedClusters
 				}
 				continue
 			}
