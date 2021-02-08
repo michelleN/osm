@@ -1,7 +1,6 @@
 package cds
 
 import (
-	"net"
 	"testing"
 
 	xds_cluster "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
@@ -15,7 +14,6 @@ import (
 	"github.com/openservicemesh/osm/pkg/catalog"
 	"github.com/openservicemesh/osm/pkg/configurator"
 	"github.com/openservicemesh/osm/pkg/constants"
-	"github.com/openservicemesh/osm/pkg/endpoint"
 	"github.com/openservicemesh/osm/pkg/envoy"
 	"github.com/openservicemesh/osm/pkg/service"
 	"github.com/openservicemesh/osm/pkg/tests"
@@ -78,14 +76,15 @@ func TestGetLocalServiceCluster(t *testing.T) {
 
 	testCases := []struct {
 		name                        string
-		endpoints                   []endpoint.Endpoint
+		portToProtocolMapping       map[uint32]string
 		expectedLocalityLbEndpoints []*xds_endpoint.LocalityLbEndpoints
 		expectedLbPolicy            xds_cluster.Cluster_LbPolicy
 		expectedProtocolSelection   xds_cluster.Cluster_ClusterProtocolSelection
+		expectedErr                 bool
 	}{
 		{
-			name:      "when service returns one endpoint",
-			endpoints: []endpoint.Endpoint{tests.Endpoint},
+			name:                  "when service returns one endpoint",
+			portToProtocolMapping: map[uint32]string{uint32(8080): "something"},
 			expectedLocalityLbEndpoints: []*xds_endpoint.LocalityLbEndpoints{
 				{
 					Locality: &xds_core.Locality{
@@ -94,7 +93,7 @@ func TestGetLocalServiceCluster(t *testing.T) {
 					LbEndpoints: []*xds_endpoint.LbEndpoint{{
 						HostIdentifier: &xds_endpoint.LbEndpoint_Endpoint{
 							Endpoint: &xds_endpoint.Endpoint{
-								Address: envoy.GetAddress(constants.WildcardIPAddr, uint32(tests.ServicePort)),
+								Address: envoy.GetAddress(constants.WildcardIPAddr, uint32(8080)),
 							},
 						},
 						LoadBalancingWeight: &wrappers.UInt32Value{
@@ -103,48 +102,36 @@ func TestGetLocalServiceCluster(t *testing.T) {
 					}},
 				},
 			},
+			expectedErr: false,
 		},
 		{
-			name: "when service returns two endpoints with same port",
-			endpoints: []endpoint.Endpoint{tests.Endpoint, {
-				IP:   net.ParseIP("1.2.3.4"),
-				Port: endpoint.Port(tests.ServicePort),
-			}},
-			expectedLocalityLbEndpoints: []*xds_endpoint.LocalityLbEndpoints{
-				{
-					Locality: &xds_core.Locality{
-						Zone: "zone",
-					},
-					LbEndpoints: []*xds_endpoint.LbEndpoint{{
-						HostIdentifier: &xds_endpoint.LbEndpoint_Endpoint{
-							Endpoint: &xds_endpoint.Endpoint{
-								Address: envoy.GetAddress(constants.WildcardIPAddr, uint32(tests.ServicePort)),
-							},
-						},
-						LoadBalancingWeight: &wrappers.UInt32Value{
-							Value: constants.ClusterWeightAcceptAll, // Local cluster accepts all traffic
-						},
-					}},
-				},
-			},
+			name:                        "when service returns multiple ports",
+			portToProtocolMapping:       map[uint32]string{uint32(8080): "something", uint32(8081): "something"},
+			expectedLocalityLbEndpoints: []*xds_endpoint.LocalityLbEndpoints{},
+			expectedErr:                 true,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			mockCatalog.EXPECT().ListEndpointsForService(proxyService).Return(tc.endpoints, nil).Times(1)
+			mockCatalog.EXPECT().GetPortToProtocolMappingForService(proxyService).Return(tc.portToProtocolMapping, nil).Times(1)
 			cluster, err := getLocalServiceCluster(mockCatalog, proxyService, clusterName)
-			assert.Nil(err)
-			assert.Equal(clusterName, cluster.Name)
-			assert.Equal(clusterName, cluster.AltStatName)
-			assert.Equal(ptypes.DurationProto(clusterConnectTimeout), cluster.ConnectTimeout)
-			assert.Equal(xds_cluster.Cluster_ROUND_ROBIN, cluster.LbPolicy)
-			assert.Equal(&xds_cluster.Cluster_Type{Type: xds_cluster.Cluster_STRICT_DNS}, cluster.ClusterDiscoveryType)
-			assert.Equal(true, cluster.RespectDnsTtl)
-			assert.Equal(xds_cluster.Cluster_V4_ONLY, cluster.DnsLookupFamily)
-			assert.Equal(xds_cluster.Cluster_USE_DOWNSTREAM_PROTOCOL, cluster.ProtocolSelection)
-			assert.Equal(len(tc.expectedLocalityLbEndpoints), len(cluster.LoadAssignment.Endpoints))
-			//assert.Equal(tc.expectedLocalityLbEndpoints, cluster.LoadAssignment.Endpoints)
+			if tc.expectedErr {
+				assert.NotNil(err)
+				assert.Nil(cluster)
+			} else {
+				assert.Nil(err)
+				assert.Equal(clusterName, cluster.Name)
+				assert.Equal(clusterName, cluster.AltStatName)
+				assert.Equal(ptypes.DurationProto(clusterConnectTimeout), cluster.ConnectTimeout)
+				assert.Equal(xds_cluster.Cluster_ROUND_ROBIN, cluster.LbPolicy)
+				assert.Equal(&xds_cluster.Cluster_Type{Type: xds_cluster.Cluster_STRICT_DNS}, cluster.ClusterDiscoveryType)
+				assert.Equal(true, cluster.RespectDnsTtl)
+				assert.Equal(xds_cluster.Cluster_V4_ONLY, cluster.DnsLookupFamily)
+				assert.Equal(xds_cluster.Cluster_USE_DOWNSTREAM_PROTOCOL, cluster.ProtocolSelection)
+				assert.Equal(len(tc.expectedLocalityLbEndpoints), len(cluster.LoadAssignment.Endpoints))
+				assert.ElementsMatch(tc.expectedLocalityLbEndpoints, cluster.LoadAssignment.Endpoints)
+			}
 		})
 	}
 }

@@ -7,9 +7,9 @@ import (
 	xds_core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	xds_endpoint "github.com/envoyproxy/go-control-plane/envoy/config/endpoint/v3"
 	"github.com/envoyproxy/go-control-plane/pkg/wellknown"
-
 	"github.com/golang/protobuf/ptypes"
 	"github.com/golang/protobuf/ptypes/wrappers"
+	"github.com/pkg/errors"
 
 	"github.com/openservicemesh/osm/pkg/catalog"
 	"github.com/openservicemesh/osm/pkg/configurator"
@@ -22,6 +22,9 @@ const (
 	// clusterConnectTimeout is the timeout duration used by Envoy to timeout connections to the cluster
 	clusterConnectTimeout = 1 * time.Second
 )
+
+// ErrMultiplePorts is an error for describing that a Kubernetes Service which exposes multiple ports in not supported
+var ErrMultiplePorts = errors.New("Error multiple ports on service not supported")
 
 // getUpstreamServiceCluster returns an Envoy Cluster corresponding to the given upstream service
 func getUpstreamServiceCluster(upstreamSvc, downstreamSvc service.MeshService, cfg configurator.Configurator) (*xds_cluster.Cluster, error) {
@@ -97,13 +100,18 @@ func getLocalServiceCluster(catalog catalog.MeshCataloger, proxyServiceName serv
 		Http2ProtocolOptions: &xds_core.Http2ProtocolOptions{},
 	}
 
-	endpoints, err := catalog.ListEndpointsForService(proxyServiceName)
+	ports, err := catalog.GetPortToProtocolMappingForService(proxyServiceName)
 	if err != nil {
-		log.Error().Err(err).Msgf("Failed to get endpoints for service %s", proxyServiceName)
+		log.Error().Err(err).Msgf("Failed to get ports for service %s", proxyServiceName)
 		return nil, err
 	}
 
-	for _, ep := range endpoints {
+	if len(ports) > 1 {
+		log.Error().Err(ErrMultiplePorts).Msgf("Error multiple ports on service %s in namespace %s", proxyServiceName.Name, proxyServiceName.Namespace)
+		return nil, ErrMultiplePorts
+	}
+
+	for port := range ports {
 		localityEndpoint := &xds_endpoint.LocalityLbEndpoints{
 			Locality: &xds_core.Locality{
 				Zone: "zone",
@@ -111,7 +119,7 @@ func getLocalServiceCluster(catalog catalog.MeshCataloger, proxyServiceName serv
 			LbEndpoints: []*xds_endpoint.LbEndpoint{{
 				HostIdentifier: &xds_endpoint.LbEndpoint_Endpoint{
 					Endpoint: &xds_endpoint.Endpoint{
-						Address: envoy.GetAddress(constants.WildcardIPAddr, uint32(ep.Port)),
+						Address: envoy.GetAddress(constants.WildcardIPAddr, port),
 					},
 				},
 				LoadBalancingWeight: &wrappers.UInt32Value{
