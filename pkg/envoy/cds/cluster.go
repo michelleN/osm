@@ -112,6 +112,7 @@ func getLocalServiceCluster(catalog catalog.MeshCataloger, proxyServiceName serv
 	}
 
 	for port := range ports {
+
 		localityEndpoint := &xds_endpoint.LocalityLbEndpoints{
 			Locality: &xds_core.Locality{
 				Zone: "zone",

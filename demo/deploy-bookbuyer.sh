@@ -12,6 +12,9 @@ CI_SLEEP_BETWEEN_REQUESTS_SECONDS="${CI_SLEEP_BETWEEN_REQUESTS_SECONDS:-1}"
 ROUTES_V2="${ROUTES_V2:-false}"
 
 if [ "$ROUTES_V2" = "true" ]; then
+  if [ "$ROUTES_V2_SPLIT" = "true" ]; then
+  BOOKSTORE_SVC=bookstore
+  fi
 BOOKSTORE_SVC=bookstore-v1
 fi
 

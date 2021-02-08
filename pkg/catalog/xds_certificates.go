@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	mapset "github.com/deckarep/golang-set"
 	"github.com/google/uuid"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -38,11 +39,26 @@ func (mc *MeshCatalog) GetServicesFromEnvoyCertificate(cn certificate.CommonName
 
 	meshServices := kubernetesServicesToMeshServices(services)
 
+	//	meshServices = mc.appendRelevantApexServices(meshServices)
+
 	servicesForPod := strings.Join(listServiceNames(meshServices), ",")
 	log.Trace().Msgf("Services associated with Pod with UID=%s Name=%s/%s: %+v",
 		pod.ObjectMeta.UID, pod.Namespace, pod.Name, servicesForPod)
 
 	return meshServices, nil
+}
+
+func (mc *MeshCatalog) appendRelevantApexServices(meshServices []service.MeshService) []service.MeshService {
+	apexServicesSet := mapset.NewSet()
+	for _, svc := range meshServices {
+		for apexFound := range mc.GetApexServicesForBackend(svc) {
+			apexServicesSet.Add(apexFound)
+		}
+	}
+	for s := range apexServicesSet.Iter() {
+		meshServices = append(meshServices, s.(service.MeshService))
+	}
+	return meshServices
 }
 
 func kubernetesServicesToMeshServices(kubernetesServices []v1.Service) (meshServices []service.MeshService) {

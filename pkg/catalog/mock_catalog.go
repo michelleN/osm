@@ -5,8 +5,6 @@
 package catalog
 
 import (
-	reflect "reflect"
-
 	gomock "github.com/golang/mock/gomock"
 	certificate "github.com/openservicemesh/osm/pkg/certificate"
 	endpoint "github.com/openservicemesh/osm/pkg/endpoint"
@@ -17,6 +15,7 @@ import (
 	v1alpha3 "github.com/servicemeshinterface/smi-sdk-go/pkg/apis/access/v1alpha3"
 	v1alpha4 "github.com/servicemeshinterface/smi-sdk-go/pkg/apis/specs/v1alpha4"
 	v1alpha2 "github.com/servicemeshinterface/smi-sdk-go/pkg/apis/split/v1alpha2"
+	reflect "reflect"
 )
 
 // MockMeshCataloger is a mock of MeshCataloger interface
@@ -54,19 +53,18 @@ func (mr *MockMeshCatalogerMockRecorder) ExpectProxy(arg0 interface{}) *gomock.C
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExpectProxy", reflect.TypeOf((*MockMeshCataloger)(nil).ExpectProxy), arg0)
 }
 
-// GetIngressRoutesPerHost mocks base method
-func (m *MockMeshCataloger) GetIngressRoutesPerHost(arg0 service.MeshService) (map[string][]trafficpolicy.HTTPRouteMatch, error) {
+// GetApexServicesForBackend mocks base method
+func (m *MockMeshCataloger) GetApexServicesForBackend(arg0 service.MeshService) []service.MeshService {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetIngressRoutesPerHost", arg0)
-	ret0, _ := ret[0].(map[string][]trafficpolicy.HTTPRouteMatch)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret := m.ctrl.Call(m, "GetApexServicesForBackend", arg0)
+	ret0, _ := ret[0].([]service.MeshService)
+	return ret0
 }
 
-// GetIngressRoutesPerHost indicates an expected call of GetIngressRoutesPerHost
-func (mr *MockMeshCatalogerMockRecorder) GetIngressRoutesPerHost(arg0 interface{}) *gomock.Call {
+// GetApexServicesForBackend indicates an expected call of GetApexServicesForBackend
+func (mr *MockMeshCatalogerMockRecorder) GetApexServicesForBackend(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetIngressRoutesPerHost", reflect.TypeOf((*MockMeshCataloger)(nil).GetIngressRoutesPerHost), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetApexServicesForBackend", reflect.TypeOf((*MockMeshCataloger)(nil).GetApexServicesForBackend), arg0)
 }
 
 // GetIngressPoliciesForService mocks base method
@@ -84,6 +82,21 @@ func (mr *MockMeshCatalogerMockRecorder) GetIngressPoliciesForService(arg0, arg1
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetIngressPoliciesForService", reflect.TypeOf((*MockMeshCataloger)(nil).GetIngressPoliciesForService), arg0, arg1)
 }
 
+// GetIngressRoutesPerHost mocks base method
+func (m *MockMeshCataloger) GetIngressRoutesPerHost(arg0 service.MeshService) (map[string][]trafficpolicy.HTTPRouteMatch, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetIngressRoutesPerHost", arg0)
+	ret0, _ := ret[0].(map[string][]trafficpolicy.HTTPRouteMatch)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetIngressRoutesPerHost indicates an expected call of GetIngressRoutesPerHost
+func (mr *MockMeshCatalogerMockRecorder) GetIngressRoutesPerHost(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetIngressRoutesPerHost", reflect.TypeOf((*MockMeshCataloger)(nil).GetIngressRoutesPerHost), arg0)
+}
+
 // GetPortToProtocolMappingForService mocks base method
 func (m *MockMeshCataloger) GetPortToProtocolMappingForService(arg0 service.MeshService) (map[uint32]string, error) {
 	m.ctrl.T.Helper()
@@ -99,7 +112,6 @@ func (mr *MockMeshCatalogerMockRecorder) GetPortToProtocolMappingForService(arg0
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPortToProtocolMappingForService", reflect.TypeOf((*MockMeshCataloger)(nil).GetPortToProtocolMappingForService), arg0)
 }
 
-// TODO : remove as a part of routes refactor (#2397)
 // GetResolvableHostnamesForUpstreamService mocks base method
 func (m *MockMeshCataloger) GetResolvableHostnamesForUpstreamService(arg0, arg1 service.MeshService) ([]string, error) {
 	m.ctrl.T.Helper()
@@ -109,7 +121,6 @@ func (m *MockMeshCataloger) GetResolvableHostnamesForUpstreamService(arg0, arg1 
 	return ret0, ret1
 }
 
-// TODO : remove as a part of routes refactor (#2397)
 // GetResolvableHostnamesForUpstreamService indicates an expected call of GetResolvableHostnamesForUpstreamService
 func (mr *MockMeshCatalogerMockRecorder) GetResolvableHostnamesForUpstreamService(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()

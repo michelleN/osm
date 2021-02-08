@@ -1,0 +1,22 @@
+apiVersion: split.smi-spec.io/v1alpha2
+kind: TrafficSplit
+metadata:
+  name: bookstore-split
+  namespace: bookstore
+spec:
+  service: bookstore
+  backends:
+  - service: bookstore-v1
+    weight: 50
+  - service: bookstore-v2
+    weight: 50
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bookstore
+  namespace: bookstore
+spec:
+  ports:
+  - port: 80
+    name: bookstore-port
