@@ -29,7 +29,7 @@ var wildCardRouteMatch trafficpolicy.HTTPRouteMatch = trafficpolicy.HTTPRouteMat
 	Methods:   []string{constants.WildcardHTTPMethod},
 }
 
-func (mc *MeshCatalog) listTrafficPoliciesForTrafficSplits(namespace string) []*trafficpolicy.OutboundTrafficPolicy {
+func (mc *MeshCatalog) listTrafficPoliciesForTrafficSplits(sourceNamespace string) []*trafficpolicy.OutboundTrafficPolicy {
 	outboundPoliciesFromSplits := []*trafficpolicy.OutboundTrafficPolicy{}
 
 	apexServices := mapset.NewSet()
@@ -40,7 +40,7 @@ func (mc *MeshCatalog) listTrafficPoliciesForTrafficSplits(namespace string) []*
 			Namespace: split.ObjectMeta.Namespace,
 		}
 
-		hostnames, err := mc.getServiceHostnames(svc, svc.Namespace == namespace)
+		hostnames, err := mc.getServiceHostnames(svc, svc.Namespace == sourceNamespace)
 		if err != nil {
 			log.Error().Err(err).Msgf("Error getting service hostnames for apex service %v", svc)
 			continue

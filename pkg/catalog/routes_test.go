@@ -12,6 +12,7 @@ import (
 	specs "github.com/servicemeshinterface/smi-sdk-go/pkg/apis/specs/v1alpha4"
 	split "github.com/servicemeshinterface/smi-sdk-go/pkg/apis/split/v1alpha2"
 	tassert "github.com/stretchr/testify/assert"
+	trequire "github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -26,6 +27,9 @@ import (
 )
 
 func TestListTrafficPoliciesForTrafficSplits(t *testing.T) {
+	assert := tassert.New(t)
+	require := trequire.New(t)
+
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
@@ -48,8 +52,19 @@ func TestListTrafficPoliciesForTrafficSplits(t *testing.T) {
 	mockMeshSpec.EXPECT().ListTrafficSplits().Return([]*split.TrafficSplit{&tests.TrafficSplit}).AnyTimes()
 	mockKubeController.EXPECT().GetService(apexMeshService).Return(apexK8sService).AnyTimes()
 
-	namespace := "foo"
-	actual := mc.listTrafficPoliciesForTrafficSplits(namespace)
+	sourceNamespace := "foo"
+	expectedRoutes := []*trafficpolicy.RouteWeightedClusters{
+		{
+			HTTPRouteMatch: wildCardRouteMatch,
+			WeightedClusters: mapset.NewSetFromSlice([]interface{}{
+				service.WeightedCluster{ClusterName: "default/bookstore-v1", Weight: 90},
+				service.WeightedCluster{ClusterName: "default/bookstore-v2", Weight: 10},
+			}),
+		},
+	}
+	actual := mc.listTrafficPoliciesForTrafficSplits(sourceNamespace)
+	require.Equal(1, len(actual))
+	assert.ElementsMatch(expectedRoutes, actual[0].Routes)
 	for _, a := range actual {
 		fmt.Println(a)
 		for _, r := range a.Routes {
