@@ -1,30 +1,9 @@
-# Deploy bookbuyer Namespace
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: bookbuyer
----
 # Deploy bookbuyer Service Account
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: bookbuyer
   namespace: bookbuyer
----
-# Deploy bookbuyer Service
-apiVersion: v1
-kind: Service
-metadata:
-  name: bookbuyer
-  namespace: bookbuyer
-  labels:
-    app: bookbuyer
-spec:
-  ports:
-  - port: 9999
-    name: dummy-unused-port
-  selector:
-    app: bookbuyer
 ---
 # Deploy bookbuyer Deployment
 apiVersion: apps/v1
@@ -47,7 +26,7 @@ spec:
       serviceAccountName: bookbuyer
       containers:
         - name: bookbuyer
-          image: openservicemesh/bookbuyer:v0.7.0
+          image: localhost:5000/bookbuyer:dev5
           imagePullPolicy: Always
           command: ["/bookbuyer"]
           env:
