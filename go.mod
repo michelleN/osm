@@ -26,6 +26,7 @@ require (
 	github.com/jstemmer/go-junit-report v0.9.1
 	github.com/matm/gocov-html v0.0.0-20200509184451-71874e2e203b
 	github.com/mitchellh/gox v1.0.1
+	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/norwoodj/helm-docs v1.4.0
 	github.com/olekukonko/tablewriter v0.0.2
 	github.com/onsi/ginkgo v1.16.1
@@ -55,6 +56,7 @@ require (
 	k8s.io/cli-runtime v0.20.5
 	k8s.io/client-go v0.20.5
 	k8s.io/code-generator v0.20.5
+	k8s.io/klog v1.0.0 // indirect
 	k8s.io/utils v0.0.0-20201110183641-67b214c5f920
 	mvdan.cc/gofumpt v0.1.0 // indirect
 	sigs.k8s.io/controller-runtime v0.6.3

@@ -19,6 +19,20 @@ kind: CustomResourceDefinition
 metadata:
   name: trafficsplits.split.smi-spec.io
 spec:
+  conversion:
+    # a Webhook strategy instruct API server to call an external webhook for any conversion between custom resources.
+    strategy: Webhook
+    # webhook is required when strategy is `Webhook` and it configures the webhook endpoint to be called by API server.
+    webhook:
+      # conversionReviewVersions indicates what ConversionReview versions are understood/preferred by the webhook.
+      # The first version in the list understood by the API server is sent to the webhook.
+      # The webhook must respond with a ConversionReview object in the same version it received.
+      conversionReviewVersions: ["v1"]
+      clientConfig:
+        service:
+          namespace: osm-system
+          name: osm-controller
+          path: /smiconvert
   group: split.smi-spec.io
   scope: Namespaced
   names:

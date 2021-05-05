@@ -14,6 +14,9 @@ spec:
     - name: debug-port
       port: 9092
       targetPort: 9092
+    - name: smi-conversion
+      port: 443
+      targetPort: 443
   selector:
     app: osm-controller
 ---

@@ -222,6 +222,11 @@ func main() {
 		events.GenericEventRecorder().FatalEvent(err, events.InitializationError, "Error creating osm-config validating webhook")
 	}
 
+	// Create the smi conversion webhook
+	if err := smi.NewConversionWebhook(kubeClient, stop); err != nil {
+		events.GenericEventRecorder().FatalEvent(err, events.InitializationError, "Error creating smi conversion webhook")
+	}
+
 	adsCert, err := certManager.IssueCertificate(xdsServerCertificateCommonName, constants.XDSCertificateValidityPeriod)
 	if err != nil {
 		events.GenericEventRecorder().FatalEvent(err, events.CertificateIssuanceFailure, "Error issuing XDS certificate to ADS server")
@@ -318,4 +323,8 @@ func getOSMControllerPod(kubeClient kubernetes.Interface) (*corev1.Pod, error) {
 	}
 
 	return pod, nil
+}
+
+func setupConversionWebhookServer() {
+
 }
