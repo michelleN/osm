@@ -35,7 +35,7 @@ require (
 	github.com/prometheus/client_golang v1.7.1
 	github.com/prometheus/common v0.10.0
 	github.com/rs/zerolog v1.18.0
-	github.com/servicemeshinterface/smi-sdk-go v0.5.0
+	github.com/servicemeshinterface/smi-sdk-go v0.5.1-0.20210429131759-a143f8bc96ec
 	github.com/spf13/cobra v1.1.1
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/objx v0.3.0 // indirect
